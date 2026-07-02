@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top K Frequent Elements 互動教學</title>
+<link rel="stylesheet" href="../css/tokens.css">
+<style>
+  /* ---- 該題獨有的視覺化 layout（顏色一律走 tokens.css 的 var） ---- */
+
+  /* nums 陣列磚塊 */
+  .nums-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center; margin: 0.5rem 0 0.2rem;
+  }
+  .numbox {
+    min-width: 2.4rem; text-align: center;
+    padding: 0.5rem 0.7rem; border: 1px solid var(--border);
+    border-radius: 8px; font-family: var(--mono); font-size: 1rem;
+    background: var(--panel2); transition: transform .25s, border-color .25s, background .25s, opacity .25s;
+  }
+  .numbox.current {
+    border-color: var(--warn); background: rgba(210,153,34,0.2);
+    transform: translateY(-4px);
+  }
+  .numbox.done { opacity: 0.35; }
+
+  /* 計數表（key = 數字，value = 次數） */
+  .count-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center; margin: 0.5rem 0; min-height: 3rem;
+  }
+  .cnt-cell {
+    display: flex; flex-direction: column; align-items: center;
+    border: 1px solid var(--border); border-radius: 6px;
+    min-width: 3rem; padding: 0.3rem 0.5rem; font-family: var(--mono);
+    background: rgba(88,166,255,0.08); transition: border-color .25s, background .25s, opacity .25s;
+    animation: pop .3s ease;
+  }
+  .cnt-cell .ck { color: var(--muted); font-size: 0.75rem; }
+  .cnt-cell .cv { color: var(--accent); font-weight: bold; font-size: 1.05rem; }
+  .cnt-cell.active { border-color: var(--warn); background: rgba(210,153,34,0.18); }
+  .cnt-cell.taken { opacity: 0.4; }
+
+  /* 籃子（以次數為索引，高次數在上） */
+  .buckets { display: flex; flex-direction: column; gap: 8px; margin: 0.5rem 0; }
+  .bucket {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px dashed var(--border); border-radius: 8px; padding: 0.5rem 0.8rem;
+    transition: border-color .25s, background .25s, opacity .25s;
+  }
+  .bucket.empty { opacity: 0.45; }
+  .bucket.flash { border-color: var(--accent2); border-style: solid; background: rgba(63,185,80,0.1); }
+  .bucket.scan  { border-color: var(--warn);   border-style: solid; background: rgba(210,153,34,0.12); }
+  .bucket-key {
+    font-family: var(--mono); font-size: 0.82rem; color: var(--muted);
+    white-space: nowrap; border-right: 1px solid var(--border);
+    padding-right: 10px; min-width: 6.5rem;
+  }
+  .bucket-key b { color: var(--accent2); }
+  .bucket-items {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    min-height: 1.6rem; align-items: center;
+  }
+  .chip {
+    padding: 0.3rem 0.6rem; border-radius: 6px; font-family: var(--mono);
+    font-size: 0.9rem; background: rgba(63,185,80,0.15);
+    border: 1px solid var(--accent2); animation: pop .3s ease;
+    transition: background .25s, border-color .25s;
+  }
+  .chip.collected { background: rgba(88,166,255,0.2); border-color: var(--accent); }
+
+  /* 答案列 */
+  .result-box { display: flex; align-items: center; gap: 12px; margin: 0.5rem 0; flex-wrap: wrap; }
+  .result-row { display: flex; gap: 6px; flex-wrap: wrap; min-height: 1.9rem; align-items: center; }
+  .res-chip {
+    padding: 0.35rem 0.7rem; border-radius: 6px; font-family: var(--mono);
+    font-size: 0.95rem; background: rgba(88,166,255,0.2);
+    border: 1px solid var(--accent); animation: pop .3s ease;
+  }
+  .counter { font-family: var(--mono); font-size: 0.9rem; color: var(--warn); }
+  .counter.full { color: var(--accent2); font-weight: bold; }
+  .res-placeholder { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Top K Frequent Elements</h1>
+  <p class="subtitle">用「桶排序」找出現次數最高的前 k 個數字，免去排序</p>
+
+  <!-- Section 1 -->
+  <div class="section">
+    <h2><span class="step-num">1</span>核心觀察</h2>
+    <p>最直覺的做法是數完每個數字的次數後，<strong>依次數排序</strong>再取前 k 個，但排序要 <code>O(n log n)</code>。這題的「進階」正是要你超越它。</p>
+    <p>關鍵：一個數字的出現次數<strong>最多就是 <code>n</code></strong>（陣列長度），所以次數一定落在 <code>1</code> 到 <code>n</code> 之間，<span class="hl">範圍有上限</span>。</p>
+    <p>範圍有上限，就能<strong>拿「次數當索引」</strong>：開一排籃子，<code>freq[i]</code> 收集所有「出現 i 次」的數字。放完後籃子本身就依次數排好了，<span class="hl">從高次數的籃子往低收 k 個</span>就是答案，全程不用比較排序。</p>
+    <div class="key">
+      <strong>心智模型</strong>：這跟 Group Anagrams 的 <code>[0] * 26</code> 是同一招——拿值本身當索引來換取 <code>O(1)</code> 定位。差別只在這裡索引代表「次數」，每格裝的是一串數字。
+    </div>
+  </div>
+
+  <!-- Section 2 -->
+  <div class="section">
+    <h2><span class="step-num">2</span>視覺化過程</h2>
+    <p style="margin-bottom:0.4rem">輸入：<code class="mono">nums = [1, 1, 1, 2, 2, 3]</code>，<code class="mono">k = 2</code></p>
+
+    <div class="phase-label" id="phaseLabel">第 1 幕：數出每個數字出現幾次</div>
+    <div class="nums-row" id="numsRow"></div>
+
+    <div class="phase-label">計數表（key = 數字，value = 次數）</div>
+    <div class="count-row" id="countRow"></div>
+
+    <div class="phase-label">籃子（索引 = 次數，高次數在上）</div>
+    <div class="buckets" id="buckets"></div>
+
+    <div class="phase-label">答案</div>
+    <div class="result-box">
+      <div class="result-row" id="resultRow"></div>
+      <span class="counter" id="counter">已收 0 / 2</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="stepBtn">下一步</button>
+      <button class="btn-reset" id="resetBtn">重設</button>
+    </div>
+
+    <div class="log" id="log">點「下一步」開始：第 1 幕先掃一遍 nums，數每個數字的次數。</div>
+  </div>
+
+  <!-- Section 3 -->
+  <div class="section">
+    <h2><span class="step-num">3</span>程式碼</h2>
+<pre><span class="kw">def</span> <span class="fn">topKFrequent</span>(nums, k):
+    count <span class="op">=</span> {}                                <span class="cm"># 數字 -> 次數</span>
+    <span class="kw">for</span> n <span class="kw">in</span> nums:
+        count[n] <span class="op">=</span> count.<span class="fn">get</span>(n, <span class="num">0</span>) <span class="op">+</span> <span class="num">1</span>
+
+    freq <span class="op">=</span> [[] <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(nums) <span class="op">+</span> <span class="num">1</span>)]  <span class="cm"># 索引 0..n，freq[i] 放出現 i 次的數字</span>
+    <span class="kw">for</span> num, c <span class="kw">in</span> count.<span class="fn">items</span>():
+        freq[c].<span class="fn">append</span>(num)                   <span class="cm"># 丟進「對應它次數」的籃子</span>
+
+    res <span class="op">=</span> []
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(freq) <span class="op">-</span> <span class="num">1</span>, <span class="num">0</span>, <span class="op">-</span><span class="num">1</span>):     <span class="cm"># 從次數最高的籃子往低掃</span>
+        <span class="kw">for</span> num <span class="kw">in</span> freq[i]:
+            res.<span class="fn">append</span>(num)
+            <span class="kw">if</span> <span class="fn">len</span>(res) <span class="op">==</span> k:               <span class="cm"># 湊滿 k 個就回傳</span>
+                <span class="kw">return</span> res
+</pre>
+    <div class="note"><strong>最容易踩的雷</strong>：建籃子要用 <code>[[] for _ in range(n + 1)]</code>，<strong>別寫</strong> <code>[[]] * (n + 1)</code>——後者每一格都指向同一個 list，往一格 append 會讓所有格一起變。</div>
+  </div>
+
+  <!-- Section 4 -->
+  <div class="section">
+    <h2><span class="step-num">4</span>複雜度</h2>
+    <table class="cx">
+      <tr><td>時間 O(n)</td><td>計數、進籃、從籃子收集各掃一遍，全程沒有排序。</td></tr>
+      <tr><td>空間 O(n)</td><td>籃子陣列有 n + 1 格，hash map 也跟相異數字個數成正比。</td></tr>
+    </table>
+    <p style="margin-top:0.8rem" class="muted">對照「排序」的做法（<code>sorted(count.items(), key=..., reverse=True)</code>）：好寫，但要 <code>O(n log n)</code>，正是這題「進階」要你超越的目標。</p>
+  </div>
+
+</div>
+
+<script>
+  const nums = [1, 1, 1, 2, 2, 3];
+  const K = 2;
+  const N = nums.length;
+
+  // live state
+  let phase, i, count, countOrder, freq, scanFreq, scanPtr, res;
+
+  const phaseLabel = document.getElementById("phaseLabel");
+  const numsRow    = document.getElementById("numsRow");
+  const countRow   = document.getElementById("countRow");
+  const bucketsEl  = document.getElementById("buckets");
+  const resultRow  = document.getElementById("resultRow");
+  const counterEl  = document.getElementById("counter");
+  const logEl      = document.getElementById("log");
+  const stepBtn    = document.getElementById("stepBtn");
+  const resetBtn   = document.getElementById("resetBtn");
+
+  function init() {
+    phase = 1; i = 0;
+    count = {}; countOrder = [];
+    freq = Array.from({ length: N + 1 }, () => []);
+    scanFreq = N; scanPtr = 0;
+    res = [];
+  }
+
+  function renderNums(curr) {
+    numsRow.innerHTML = "";
+    nums.forEach((v, j) => {
+      const d = document.createElement("div");
+      let cls = "numbox";
+      if (phase === 1) {
+        if (j < curr) cls += " done";
+        if (j === curr) cls += " current";
+      } else {
+        cls += " done";
+      }
+      d.className = cls;
+      d.textContent = v;
+      numsRow.appendChild(d);
+    });
+  }
+
+  function renderCount(activeNum) {
+    countRow.innerHTML = "";
+    countOrder.forEach(num => {
+      const d = document.createElement("div");
+      let cls = "cnt-cell";
+      if (num === activeNum) cls += " active";
+      // 第 2 幕之後：已進籃的數字調暗
+      if (phase >= 2 && freq[count[num]].includes(num)) cls += " taken";
+      d.className = cls;
+      d.innerHTML = `<span class="ck">${num}</span><span class="cv">${count[num]}</span>`;
+      countRow.appendChild(d);
+    });
+  }
+
+  function renderBuckets(flashFreq) {
+    bucketsEl.innerHTML = "";
+    for (let f = N; f >= 1; f--) {
+      const b = document.createElement("div");
+      let cls = "bucket";
+      if (freq[f].length === 0) cls += " empty";
+      if (f === flashFreq) cls += " flash";
+      if (phase === 3 && f === scanFreq) cls += " scan";
+      b.className = cls;
+      const chips = freq[f].map(num => {
+        const taken = res.includes(num) ? " collected" : "";
+        return `<span class="chip${taken}">${num}</span>`;
+      }).join("");
+      b.innerHTML =
+        `<span class="bucket-key">出現 <b>${f}</b> 次</span>` +
+        `<span class="bucket-items">${chips || '<span class="res-placeholder">—</span>'}</span>`;
+      bucketsEl.appendChild(b);
+    }
+  }
+
+  function renderResult() {
+    resultRow.innerHTML = res.length
+      ? res.map(num => `<span class="res-chip">${num}</span>`).join("")
+      : '<span class="res-placeholder">（尚未收集）</span>';
+    counterEl.textContent = `已收 ${res.length} / ${K}`;
+    counterEl.className = "counter" + (res.length === K ? " full" : "");
+  }
+
+  function finish(msg) {
+    stepBtn.disabled = true;
+    stepBtn.textContent = "完成";
+    logEl.innerHTML += `　|　<span class="stop">${msg}</span>`;
+  }
+
+  function step() {
+    if (stepBtn.disabled) return;
+
+    // 第 1 幕：計數
+    if (phase === 1) {
+      const v = nums[i];
+      const first = !(v in count);
+      count[v] = (count[v] || 0) + 1;
+      if (first) countOrder.push(v);
+      renderNums(i);
+      renderCount(v);
+      renderBuckets(null);
+      logEl.innerHTML = `數到 <span class="new">nums[${i}] = ${v}</span> → count[${v}] 變成 <span class="ok">${count[v]}</span>`;
+      i++;
+      if (i >= N) {
+        phase = 2; i = 0;
+        phaseLabel.textContent = "第 2 幕：把每個數字丟進「對應它次數」的籃子";
+      }
+      return;
+    }
+
+    // 第 2 幕：進籃
+    if (phase === 2) {
+      const num = countOrder[i];
+      const c = count[num];
+      freq[c].push(num);
+      renderNums(-1);
+      renderCount(null);
+      renderBuckets(c);
+      renderResult();
+      logEl.innerHTML = `數字 <span class="new">${num}</span> 出現 ${c} 次 → 丟進 <span class="ok">「出現 ${c} 次」</span>的籃子`;
+      i++;
+      if (i >= countOrder.length) {
+        phase = 3; scanFreq = N; scanPtr = 0;
+        phaseLabel.textContent = "第 3 幕：從次數最高的籃子往低收，湊滿 k 個就停";
+        renderResult();
+      }
+      return;
+    }
+
+    // 第 3 幕：從高往低收集
+    if (phase === 3) {
+      if (scanFreq < 1) { finish("掃完了"); return; }
+
+      const bucket = freq[scanFreq];
+
+      // 空籃子：跳過
+      if (bucket.length === 0) {
+        renderBuckets(null);
+        logEl.innerHTML = `掃描 <span class="new">「出現 ${scanFreq} 次」</span>的籃子 → 空的，<span class="new">跳過</span>`;
+        scanFreq--;
+        return;
+      }
+
+      // 這個籃子收完了：往下一個
+      if (scanPtr >= bucket.length) {
+        const finished = scanFreq;
+        scanFreq--; scanPtr = 0;
+        renderBuckets(null);
+        logEl.innerHTML = `「出現 ${finished} 次」的籃子收完了，往下一個籃子`;
+        return;
+      }
+
+      // 收一個
+      const num = bucket[scanPtr];
+      res.push(num);
+      scanPtr++;
+      renderBuckets(null);
+      renderResult();
+      if (res.length === K) {
+        logEl.innerHTML = `從「出現 ${scanFreq} 次」籃收下 <span class="ok">${num}</span>（已收 ${res.length}/${K}）`;
+        finish(`湊滿 ${K} 個，回傳 [${res.join(", ")}]`);
+        return;
+      }
+      logEl.innerHTML = `從「出現 ${scanFreq} 次」籃收下 <span class="ok">${num}</span>（已收 ${res.length}/${K}），繼續`;
+      return;
+    }
+  }
+
+  function reset() {
+    init();
+    phaseLabel.textContent = "第 1 幕：數出每個數字出現幾次";
+    countRow.innerHTML = "";
+    logEl.innerHTML = "點「下一步」開始：第 1 幕先掃一遍 nums，數每個數字的次數。";
+    stepBtn.disabled = false;
+    stepBtn.textContent = "下一步";
+    renderNums(0);
+    renderBuckets(null);
+    renderResult();
+  }
+
+  stepBtn.addEventListener("click", step);
+  resetBtn.addEventListener("click", reset);
+
+  init();
+  renderNums(0);
+  renderBuckets(null);
+  renderResult();
+</script>
+</body>
+</html>

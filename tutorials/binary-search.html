@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search 互動教學</title>
+<link rel="stylesheet" href="../css/tokens.css">
+<style>
+  /* ===== 本題獨有：陣列視覺化 layout ===== */
+  .array {
+    display: flex; gap: 8px; justify-content: center;
+    margin: 1.6rem 0 0.2rem; flex-wrap: wrap;
+  }
+  .cell-wrap { display: flex; flex-direction: column; align-items: center; }
+  .cell {
+    width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 1.25rem; font-weight: 700;
+    background: var(--panel2); border: 2px solid var(--border);
+    transition: background .3s, border-color .3s, box-shadow .3s, opacity .3s;
+  }
+  .cell.alive { background: rgba(63, 185, 80, 0.18); border-color: var(--accent2); }
+  .cell.dead  { background: rgba(139, 148, 158, 0.12); color: var(--muted); border-color: transparent; opacity: 0.45; }
+  .cell.mid   { border-color: var(--ptr-m); box-shadow: 0 0 0 3px rgba(255, 210, 74, 0.3); }
+  .cell.found { background: rgba(63, 185, 80, 0.32); border-color: var(--accent2); box-shadow: 0 0 14px rgba(63, 185, 80, 0.5); }
+  .cell.new { animation: pop .3s ease; }
+  .idx { font-size: 0.72rem; color: var(--muted); margin-top: 5px; }
+  .badges { display: flex; gap: 3px; height: 20px; margin-top: 5px; justify-content: center; }
+
+  .vars {
+    display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;
+    margin-top: 0.9rem; font-family: var(--mono); font-size: 0.9rem; color: var(--muted);
+  }
+  .vars b { color: var(--ptr-m); }
+
+  @media (max-width: 600px) {
+    .array { gap: 5px; }
+    .cell { width: 40px; height: 40px; font-size: 1rem; border-radius: 8px; }
+    .idx { font-size: 0.65rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Binary Search</h1>
+  <p class="subtitle">用一個心智模型把所有眉角串起來，不要分開背。</p>
+
+  <!-- ========== 1. 核心觀察 ========== -->
+  <div class="section">
+    <h2><span class="step-num">1</span>核心觀察</h2>
+    <div class="key">
+      <b>一句話心智模型：</b><code>[l, r]</code> 是一段「<b>還沒排除、答案可能藏在裡面</b>」的閉區間。
+      每一步只看正中間那個，就能砍掉一半。所有眉角（<code>&lt;=</code> 的等號、<code>//2</code>、<code>±1</code>）都只是為了讓這個區間定義「自洽」。
+    </div>
+    <p>前提：陣列<b>已排序</b>。因為排序過，比一次中點就能判斷 target 落在左半還右半，於是每一步都能丟掉一半候選，總共最多 <code>log₂n</code> 步就見底，這就是 <span class="hl">O(log n)</span> 的來源。</p>
+    <p class="muted">這一題的變體：找不到時不是回 <code>-1</code>，而是回 <code>l</code>（target 該插進去的位置，也就是 lower bound）。細節在下方第 4 個眉角。</p>
+  </div>
+
+  <!-- ========== 2. 互動視覺化 ========== -->
+  <div class="section">
+    <h2><span class="step-num">2</span>自己玩一遍</h2>
+    <p class="muted">輸入一個 target，按「下一步」看 <code>l</code>（左）、<code>r</code>（右）、<code>m</code>（中）怎麼動。
+    <span style="color:var(--accent2)">綠色</span> = 還沒排除的候選區，<span style="color:var(--muted)">灰色</span> = 已確定不可能、被砍掉的。</p>
+
+    <div class="controls">
+      <label for="target">target =</label>
+      <input type="number" id="target" value="9">
+      <button class="btn-reset" id="resetBtn">重新開始</button>
+      <button class="btn ghost" id="stepBtn">下一步 ▶</button>
+      <button class="btn ghost" id="autoBtn">自動播放</button>
+    </div>
+    <p class="muted" id="hint" style="text-align:center; font-size:0.82rem; margin:0.2rem 0 0;"></p>
+
+    <div class="array" id="array"></div>
+    <div class="vars" id="vars"></div>
+    <div class="status" id="status"></div>
+
+    <p class="phase-label">目前執行到的程式碼行：</p>
+    <pre id="code"><span class="ln" data-line="1"><span class="kw">while</span> l <span class="op">&lt;=</span> r<span class="op">:</span></span><span class="ln" data-line="2">    m <span class="op">=</span> (l <span class="op">+</span> r) <span class="op">//</span> <span class="num">2</span></span><span class="ln" data-line="3">    <span class="kw">if</span> nums[m] <span class="op">&gt;</span> target<span class="op">:</span>   <span class="cm"># 中間太大 → 砍右半</span></span><span class="ln" data-line="4">        r <span class="op">=</span> m <span class="op">-</span> <span class="num">1</span></span><span class="ln" data-line="5">    <span class="kw">elif</span> nums[m] <span class="op">&lt;</span> target<span class="op">:</span> <span class="cm"># 中間太小 → 砍左半</span></span><span class="ln" data-line="6">        l <span class="op">=</span> m <span class="op">+</span> <span class="num">1</span></span><span class="ln" data-line="7">    <span class="kw">else</span><span class="op">:</span>                  <span class="cm"># 命中</span></span><span class="ln" data-line="8">        <span class="kw">return</span> m</span><span class="ln" data-line="9"><span class="kw">return</span> l                  <span class="cm"># 找不到：l 就是插入點</span></span></pre>
+  </div>
+
+  <!-- ========== 3. 眉角逐一拆解 ========== -->
+  <div class="section">
+    <h2><span class="step-num">3</span>眉角逐一拆解</h2>
+
+    <details open>
+      <summary>為什麼 <code>while l &lt;= r</code> 要有等號？</summary>
+      <div class="body">
+        <p>因為 <code>[l, r]</code> 是<b>閉區間</b>：兩端 <code>l</code> 和 <code>r</code> 指到的元素，<b>都還沒被檢查、都還是候選</b>。</p>
+        <p>當區間縮到剩最後一個元素時，<code>l == r</code>。這時候還有<b>一個</b>沒看過的元素 <code>nums[l]</code>，它可能正好就是 target。</p>
+        <div class="key">如果寫成 <code>l &lt; r</code>，當 <code>l == r</code> 時就直接跳出迴圈，<b>漏掉最後一個元素沒檢查</b>，答案可能被吃掉。</div>
+        <p>判斷法則：<b>更新方式決定區間是開還是閉，區間決定迴圈條件。</b>這題用 <code>l=m+1</code> / <code>r=m-1</code>（兩端都排除，閉區間 <code>[l, r]</code>），所以條件必須是 <code>l &lt;= r</code>。三者要綁一起，不能混搭。</p>
+        <table class="grid">
+          <tr><th>更新方式</th><th>區間意義</th><th>迴圈條件</th></tr>
+          <tr><td><code>l=m+1, r=m-1</code></td><td><code>[l, r]</code> 閉</td><td><span class="tag good">l &lt;= r</span></td></tr>
+          <tr><td><code>l=m+1, r=m</code></td><td><code>[l, r)</code> 半開</td><td><span class="tag bad">l &lt; r</span></td></tr>
+        </table>
+        <p class="muted">本題用第一種就好。記一種、記熟、記到自洽，比記三種混在一起更不會錯。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>為什麼 <code>m = (l + r) // 2</code>？</summary>
+      <div class="body">
+        <p><b>取區間正中間</b>。看中間那個，不管結果是大是小，都能一次砍掉<b>一半</b>候選，這就是 <code>O(log n)</code> 的來源（n 個元素最多砍 log₂n 次就見底）。</p>
+        <h3>為什麼用 <code>//</code>（整數除法）？</h3>
+        <p>index 必須是整數。<code>(0 + 3) // 2 = 1</code>，自動<b>無條件捨去</b>。偶數個元素時會取到<b>偏左</b>的中點，沒關係，只要每次都砍掉一塊，遲早收斂。</p>
+        <div class="note"><strong>Python 地雷：</strong><code>//</code> 是整數除法（往下取整），<code>/</code> 會得到浮點數，不能拿來當 index。JS 要用 <code>Math.floor((l + r) / 2)</code>。</div>
+        <h3>面試加分：<code>l + (r - l) // 2</code></h3>
+        <p>跟 <code>(l + r) // 2</code> 數學上等價，但避免 <code>l + r</code> 在超大陣列時<b>整數溢位（overflow）</b>。Python 整數無上限不會溢位，但 Java／C++ 會。面試時講得出這點會加分。</p>
+        <div class="key">重點：<code>//2</code> 不是魔法，就是「砍半」這個動作的實作。每一步丟掉一半 = log 級別的速度。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>為什麼是 <code>l = m + 1</code> / <code>r = m - 1</code>，不是 <code>l = m</code>？</summary>
+      <div class="body">
+        <p>因為 <code>nums[m]</code> 這一格<b>剛剛已經比較過了</b>。既然它不等於 target（等於的話早就 <code>return m</code> 了），就沒理由把它留在候選區，直接從 <code>m+1</code> 或 <code>m-1</code> 繼續。</p>
+        <div class="note"><strong>致命 bug：</strong>如果寫成 <code>l = m</code>（不 +1），當區間剩兩格、中點算出來剛好等於 <code>l</code> 時，<code>l</code> 永遠不動，變成<b>無窮迴圈</b>。<code>+1</code> 保證每一步區間一定變小。</div>
+        <p>這也呼應第一個眉角：<b>「把 m 排除掉」</b>正是讓區間維持閉區間 <code>[l, r]</code> 的原因，所以條件才用 <code>&lt;=</code>。眉角全部連動。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>為什麼找不到時 <code>return l</code>（而不是 r、不是 -1）？</summary>
+      <div class="body">
+        <p>每一步都在維持一個<b>不變量（invariant）</b>：</p>
+        <table class="grid">
+          <tr><th>位置</th><th>已確定的性質</th></tr>
+          <tr><td>所有 index <code>&lt; l</code></td><td>元素都<b>比 target 小</b></td></tr>
+          <tr><td>所有 index <code>&gt; r</code></td><td>元素都<b>比 target 大</b></td></tr>
+        </table>
+        <p>當 <code>l &gt; r</code>、迴圈結束，中間「沒判定」的區間消失，左邊全部 &lt; target、右邊全部 &gt; target。<code>l</code> 剛好卡在分界線上 = <b>第一個「不小於 target」的位置</b>，這正是 target 該插進去的 index。</p>
+        <div class="key">普通「找不到回 <code>-1</code>」的 binary search，這題只改最後一行成 <code>return l</code>。因為 <code>l</code> 會自然收斂到 <b>lower bound（第一個 ≥ target 的位置）</b>。</div>
+        <p>用上面的互動，輸入一個陣列裡<b>沒有</b>的數（例如 7、0、100），跑到結束，看 <code>l</code> 停在哪，它每次都會落在正確的插入點。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>怎樣才不算「背誦」？一個自我檢查</summary>
+      <div class="body">
+        <p>能回答這四題，就代表你是<b>推導</b>而非背：</p>
+        <ol>
+          <li>如果把 <code>r</code> 初始化成 <code>len(nums)</code>（而非 <code>len(nums)-1</code>），其他要跟著改什麼？<br><span class="muted">答：區間變半開 <code>[l, r)</code>，條件改 <code>l &lt; r</code>，<code>r = m</code> 不減 1。</span></li>
+          <li><code>l = m</code> 為什麼會無窮迴圈？<br><span class="muted">答：中點偏左，<code>l</code> 不動。</span></li>
+          <li>為什麼能保證 <code>O(log n)</code>？<br><span class="muted">答：每步砍一半。</span></li>
+          <li>找不到時 <code>l</code> 的物理意義是什麼？<br><span class="muted">答：第一個 ≥ target 的位置。</span></li>
+        </ol>
+        <p class="muted">把「條件、初始值、更新、回傳」當成一組會互相牽動的齒輪，而不是四句咒語，這就是脫離背誦的關鍵。</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ========== 4. 完整程式碼 ========== -->
+  <div class="section">
+    <h2><span class="step-num">4</span>完整程式碼</h2>
+    <pre><span class="kw">class</span> <span class="fn">Solution</span><span class="op">:</span>
+    <span class="kw">def</span> <span class="fn">search</span>(self, nums<span class="op">:</span> list[<span class="fn">int</span>], target<span class="op">:</span> <span class="fn">int</span>) <span class="op">-&gt;</span> <span class="fn">int</span><span class="op">:</span>
+        l, r <span class="op">=</span> <span class="num">0</span>, <span class="fn">len</span>(nums) <span class="op">-</span> <span class="num">1</span>
+        <span class="kw">while</span> l <span class="op">&lt;=</span> r<span class="op">:</span>
+            m <span class="op">=</span> l <span class="op">+</span> (r <span class="op">-</span> l) <span class="op">//</span> <span class="num">2</span>   <span class="cm"># 防溢位寫法</span>
+            <span class="kw">if</span> nums[m] <span class="op">&gt;</span> target<span class="op">:</span>
+                r <span class="op">=</span> m <span class="op">-</span> <span class="num">1</span>
+            <span class="kw">elif</span> nums[m] <span class="op">&lt;</span> target<span class="op">:</span>
+                l <span class="op">=</span> m <span class="op">+</span> <span class="num">1</span>
+            <span class="kw">else</span><span class="op">:</span>
+                <span class="kw">return</span> m
+        <span class="kw">return</span> l   <span class="cm"># 找不到：l 是插入點 / lower bound</span></pre>
+    <div class="note"><strong>最容易踩的雷</strong>：迴圈條件的等號（<code>&lt;=</code>）、更新的 <code>±1</code>、以及回傳的 <code>l</code> 三者是一組。要嘛整組閉區間、要嘛整組半開，不能混搭，否則不是漏檢查就是無窮迴圈。</div>
+  </div>
+
+  <!-- ========== 5. 複雜度 ========== -->
+  <div class="section">
+    <h2><span class="step-num">5</span>複雜度</h2>
+    <table class="cx">
+      <tr><td>時間 O(log n)</td><td>每一步都把候選區間砍一半，n 個元素最多 log₂n 步就縮到空。</td></tr>
+      <tr><td>空間 O(1)</td><td>只用了 <code>l</code>、<code>r</code>、<code>m</code> 三個變數，跟輸入大小無關（迴圈版沒有遞迴堆疊）。</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+const ARR = [2, 5, 8, 12, 16, 23, 38, 56];
+let state = null;
+let timer = null;
+
+const $ = (id) => document.getElementById(id);
+
+function initState(target) {
+  return { l: 0, r: ARR.length - 1, m: null, target, phase: 'mid', done: false, result: null, line: 1 };
+}
+
+function render(animateMid) {
+  const { l, r, m, done, result } = state;
+  const arrEl = $('array');
+  arrEl.innerHTML = '';
+
+  ARR.forEach((v, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'cell-wrap';
+
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    if (done && result !== null && i === result && ARR[i] === state.target) {
+      cell.classList.add('found');
+    } else if (i >= l && i <= r) {
+      cell.classList.add('alive');
+      if (i === m && !done) {
+        cell.classList.add('mid');
+        if (animateMid) cell.classList.add('new');
+      }
+    } else {
+      cell.classList.add('dead');
+    }
+    cell.textContent = v;
+
+    const idx = document.createElement('div');
+    idx.className = 'idx';
+    idx.textContent = i;
+
+    const badges = document.createElement('div');
+    badges.className = 'badges';
+    if (i === l && !done || (i === l && done)) {
+      const b = document.createElement('span'); b.className = 'ptr l'; b.textContent = 'l'; badges.appendChild(b);
+    }
+    if (i === r) {
+      const b = document.createElement('span'); b.className = 'ptr r'; b.textContent = 'r'; badges.appendChild(b);
+    }
+    if (i === m && !done) {
+      const b = document.createElement('span'); b.className = 'ptr m'; b.textContent = 'm'; badges.appendChild(b);
+    }
+
+    wrap.appendChild(cell);
+    wrap.appendChild(idx);
+    wrap.appendChild(badges);
+    arrEl.appendChild(wrap);
+  });
+
+  $('vars').innerHTML =
+    `<span>l = <b>${l}</b></span>` +
+    `<span>r = <b>${r}</b></span>` +
+    `<span>m = <b>${m === null ? '—' : m}</b></span>`;
+
+  document.querySelectorAll('.ln').forEach((el) => el.classList.remove('active'));
+  const active = document.querySelector(`.ln[data-line="${state.line}"]`);
+  if (active) active.classList.add('active');
+}
+
+function setStatus(txt, cls) {
+  const s = $('status');
+  s.className = 'status' + (cls ? ' ' + cls : '');
+  s.innerHTML = txt;
+}
+
+function finish() {
+  $('stepBtn').disabled = true;
+  $('autoBtn').disabled = true;
+  stopAuto();
+}
+
+function step() {
+  if (!state || state.done) return;
+  const { target } = state;
+
+  if (state.phase === 'mid') {
+    if (state.l > state.r) {
+      state.done = true;
+      state.result = state.l;
+      state.line = 9;
+      const inRange = state.l < ARR.length;
+      setStatus(
+        `迴圈結束：<b>l (${state.l}) &gt; r (${state.r})</b>，沒找到 ${target}。<br>` +
+        `<code>l = ${state.l}</code> 就是插入點，<b>return ${state.l}</b>。` +
+        (inRange ? `（插在 ${ARR[state.l]} 前面）` : `（插在陣列最尾巴）`),
+        'done'
+      );
+      finish();
+      render();
+      return;
+    }
+    state.m = Math.floor((state.l + state.r) / 2);
+    state.line = 2;
+    state.phase = 'compare';
+    setStatus(
+      `算中點：<code>m = (${state.l} + ${state.r}) // 2 = ${state.m}</code>。` +
+      `比較 <code>nums[${state.m}] = ${ARR[state.m]}</code> 和 target <code>${target}</code>。`
+    );
+    render(true);
+    return;
+  }
+
+  // phase === 'compare'
+  const mv = ARR[state.m];
+  if (mv > target) {
+    state.line = 4;
+    setStatus(
+      `<code>nums[${state.m}] = ${mv} &gt; ${target}</code>，中間太大。<br>` +
+      `target 只可能在<b>左半</b>，砍掉 m 及右邊：<code>r = ${state.m} - 1 = ${state.m - 1}</code>。`
+    );
+    state.r = state.m - 1;
+    state.m = null;
+    state.phase = 'mid';
+    render();
+  } else if (mv < target) {
+    state.line = 6;
+    setStatus(
+      `<code>nums[${state.m}] = ${mv} &lt; ${target}</code>，中間太小。<br>` +
+      `target 只可能在<b>右半</b>，砍掉 m 及左邊：<code>l = ${state.m} + 1 = ${state.m + 1}</code>。`
+    );
+    state.l = state.m + 1;
+    state.m = null;
+    state.phase = 'mid';
+    render();
+  } else {
+    state.line = 8;
+    state.done = true;
+    state.result = state.m;
+    setStatus(`<code>nums[${state.m}] = ${mv} == ${target}</code>，<b>命中！return ${state.m}</b>`, 'found');
+    finish();
+    render();
+  }
+}
+
+function stopAuto() {
+  if (timer) { clearInterval(timer); timer = null; }
+  $('autoBtn').textContent = '自動播放';
+}
+
+function toggleAuto() {
+  if (timer) { stopAuto(); return; }
+  if (!state || state.done) return;
+  $('autoBtn').textContent = '暫停 ❚❚';
+  timer = setInterval(() => {
+    if (!state || state.done) { stopAuto(); return; }
+    step();
+  }, 900);
+}
+
+function reset() {
+  stopAuto();
+  const t = parseInt($('target').value, 10);
+  state = initState(Number.isNaN(t) ? 9 : t);
+  $('stepBtn').disabled = false;
+  $('autoBtn').disabled = false;
+  $('hint').textContent = `陣列（已排序）：[${ARR.join(', ')}]`;
+  setStatus(`準備搜尋 <b>${state.target}</b>。整個陣列都是候選（綠色）。按「下一步」開始。`);
+  render();
+}
+
+$('resetBtn').addEventListener('click', reset);
+$('stepBtn').addEventListener('click', step);
+$('autoBtn').addEventListener('click', toggleAuto);
+$('target').addEventListener('keydown', (e) => { if (e.key === 'Enter') reset(); });
+
+reset();
+</script>
+</body>
+</html>

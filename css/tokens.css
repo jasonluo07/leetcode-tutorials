@@ -1,0 +1,201 @@
+/* ============================================================
+   LeetCode Tutorials — 共用設計系統 (design tokens + 元件)
+   每個 tutorial 都 <link> 這支檔案，只在該頁 <style> 補「該題獨有」的視覺化樣式。
+   顏色一律走 var(--token)，不要在各頁重新定義色碼，才不會再漂移。
+   ============================================================ */
+
+:root {
+  /* 表面 / 文字 */
+  --bg: #0d1117;          /* 頁面底 */
+  --panel: #161b22;       /* 卡片 */
+  --panel2: #0d1117;      /* 內嵌區塊（pre、log、input）底 */
+  --border: #30363d;
+  --text: #c9d1d9;
+  --muted: #8b949e;
+
+  /* 語意色 */
+  --accent: #58a6ff;      /* 主色：藍 */
+  --accent2: #3fb950;     /* 成功 / 次標題：綠 */
+  --warn: #d29922;        /* 提醒 / 進行中：琥珀 */
+  --danger: #f85149;      /* 錯誤 / 停止：紅 */
+  --purple: #bc8cff;      /* 關鍵字 / 行內 code 文字 */
+  --good: var(--accent2);
+  --bad: var(--danger);
+
+  /* 演算法視覺化：指標 */
+  --ptr-l: #58a6ff;       /* left */
+  --ptr-r: #ff6b8a;       /* right */
+  --ptr-m: #ffd24a;       /* mid */
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 12px;
+  --maxw: 900px;
+}
+
+/* ---------- reset ---------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ---------- shell ---------- */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+               "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 2rem 1rem;
+}
+.container { max-width: var(--maxw); margin: 0 auto; }
+
+/* ---------- typography ---------- */
+h1 { font-size: 1.8rem; color: var(--accent); margin-bottom: 0.4rem; text-align: center; }
+.subtitle { text-align: center; color: var(--muted); margin-bottom: 2rem; font-size: 0.95rem; }
+h3 { font-size: 1rem; color: var(--accent); margin: 1.2rem 0 0.4rem; }
+p { margin-bottom: 0.6rem; }
+strong, b { color: var(--text); }
+.hl { color: var(--warn); font-weight: bold; }
+.muted { color: var(--muted); }
+ul, ol { margin: 0.4rem 0 0.6rem 1.4rem; }
+li { margin-bottom: 0.3rem; }
+
+code, .mono { font-family: var(--mono); }
+code {
+  background: rgba(110, 118, 129, 0.18); padding: 0.1rem 0.35rem;
+  border-radius: 4px; font-size: 0.9em; color: var(--purple);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- section card ---------- */
+.section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.section h2 {
+  font-size: 1.2rem; color: var(--accent2); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.6rem; height: 1.6rem; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); color: var(--bg); font-size: 0.9rem; font-weight: bold;
+}
+.phase-label { color: var(--muted); font-size: 0.9rem; margin: 1rem 0 0.4rem; }
+
+/* ---------- code block ---------- */
+pre {
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem; overflow-x: auto; font-family: var(--mono);
+  font-size: 0.85rem; line-height: 1.55; margin: 0.8rem 0;
+}
+pre .kw { color: var(--purple); }
+pre .fn { color: var(--accent); }
+pre .str, pre .num { color: var(--accent2); }
+pre .op { color: #89ddff; }
+pre .cm { color: var(--muted); font-style: italic; }
+/* 逐行 highlight（互動時標示目前執行到哪行）*/
+pre .ln { display: block; padding: 1px 8px; border-radius: 4px; }
+pre .ln.active { background: rgba(88, 166, 255, 0.18); }
+
+/* ---------- callouts ---------- */
+.note {
+  border-left: 3px solid var(--warn); background: rgba(210, 153, 34, 0.08);
+  padding: 0.6rem 0.9rem; border-radius: 0 6px 6px 0; margin: 0.8rem 0; font-size: 0.92rem;
+}
+.key {
+  border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1);
+  padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin: 0.9rem 0;
+}
+
+/* ---------- controls ---------- */
+.controls {
+  display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;
+  justify-content: center; margin: 1.2rem 0 0.5rem;
+}
+.controls label { color: var(--muted); font-size: 0.9rem; }
+.btn, button {
+  background: var(--accent); color: var(--bg); border: none;
+  padding: 0.5rem 1.2rem; border-radius: 8px; font-size: 0.95rem;
+  font-weight: 600; cursor: pointer; transition: opacity 0.2s, filter 0.2s;
+}
+.btn:hover, button:hover { opacity: 0.85; }
+.btn:disabled, button:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.ghost, button.ghost, .btn-reset {
+  background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+}
+input[type=number], input[type=text] {
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 0.45rem 0.6rem; width: 5rem; font-size: 0.95rem;
+  font-family: var(--mono);
+}
+
+/* ---------- status / log ---------- */
+.log, .status {
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.8rem 1rem; font-size: 0.9rem; color: var(--muted);
+  min-height: 2.5rem; margin-top: 1rem;
+}
+.log { font-family: var(--mono); font-size: 0.85rem; }
+.status { border-left: 3px solid var(--accent); }
+.status.found { border-left-color: var(--good); color: var(--text); }
+.status.done { border-left-color: var(--ptr-m); color: var(--text); }
+.log .ok, .ok { color: var(--accent2); }
+.log .new, .new { color: var(--warn); }
+.log .stop, .stop { color: var(--danger); font-weight: bold; }
+
+/* ---------- tables ---------- */
+table.cx { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+table.cx td { border: 1px solid var(--border); padding: 0.5rem 0.8rem; vertical-align: top; }
+table.cx td:first-child { color: var(--accent); font-family: var(--mono); white-space: nowrap; }
+
+table.grid { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.9rem; }
+table.grid th, table.grid td { border: 1px solid var(--border); padding: 0.45rem 0.7rem; text-align: center; }
+table.grid th { background: var(--panel2); color: var(--muted); }
+
+/* ---------- accordion（眉角深入）---------- */
+details {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); margin: 0.8rem 0; overflow: hidden;
+}
+summary { padding: 1rem 1.2rem; cursor: pointer; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "▸ "; color: var(--accent); }
+details[open] summary::before { content: "▾ "; }
+details .body { padding: 0 1.2rem 1.1rem; }
+
+/* ---------- tags ---------- */
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+.tag.good { background: rgba(63, 185, 80, 0.2); color: var(--good); }
+.tag.bad { background: rgba(255, 107, 138, 0.2); color: var(--bad); }
+
+/* ---------- 指標徽章（陣列類視覺化共用）---------- */
+.ptr { font-size: 0.75rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+.ptr.l { color: #fff; background: var(--ptr-l); }
+.ptr.r { color: #fff; background: var(--ptr-r); }
+.ptr.m { color: #000; background: var(--ptr-m); }
+
+/* ---------- 動畫 ---------- */
+@keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------- 手機 ---------- */
+@media (max-width: 600px) {
+  body { padding: 1.2rem 0.7rem; }
+  .section { padding: 1.1rem; }
+  h1 { font-size: 1.5rem; }
+}
+
+/* ---------- 首頁（index）---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+a.card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.2rem; transition: border-color 0.2s, transform 0.2s;
+}
+a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+a.card .card-title { color: var(--accent); font-weight: 600; font-size: 1.05rem; margin-bottom: 0.3rem; }
+a.card .card-meta { color: var(--muted); font-size: 0.85rem; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.badge.easy { background: rgba(63, 185, 80, 0.18); color: var(--accent2); }
+.badge.medium { background: rgba(210, 153, 34, 0.18); color: var(--warn); }
+.badge.hard { background: rgba(248, 81, 73, 0.18); color: var(--danger); }

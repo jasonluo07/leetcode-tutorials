@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Group Anagrams 互動教學</title>
+<link rel="stylesheet" href="../css/tokens.css">
+<style>
+  /* ===== 本題獨有的視覺化 layout（顏色一律走 var(--token)）===== */
+
+  /* 輸入字串磚塊 */
+  .words-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center; margin: 0.4rem 0 0.2rem;
+  }
+  .word {
+    padding: 0.45rem 0.85rem; border: 1px solid var(--border);
+    border-radius: 8px; font-family: var(--mono); font-size: 1rem;
+    background: var(--panel2); transition: transform 0.25s, border-color 0.25s, opacity 0.25s;
+  }
+  .word.pending { color: var(--muted); }
+  .word.next   { border-style: dashed; border-color: var(--warn); color: var(--text); }
+  .word.active { border-color: var(--bc); color: var(--text); transform: translateY(-4px);
+                 box-shadow: 0 0 0 1px var(--bc), 0 6px 14px rgba(0,0,0,0.35); }
+  .word.done   { opacity: 0.4; }
+
+  /* 字母計數簽名（長度 26） */
+  .sig-panel { min-height: 5.5rem; margin: 0.6rem 0 0.2rem; }
+  .sig-caption { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; text-align: center; }
+  .sig-caption b { color: var(--text); }
+  .sig-strip {
+    display: flex; gap: 3px; flex-wrap: wrap; justify-content: center;
+  }
+  .sig-cell {
+    display: flex; flex-direction: column; align-items: center;
+    border: 1px solid var(--border); border-radius: 5px;
+    min-width: 22px; padding: 2px 1px; font-family: var(--mono);
+    font-size: 0.72rem; line-height: 1.25; background: var(--panel2);
+  }
+  .sig-cell .ltr { color: var(--muted); }
+  .sig-cell .cnt { color: var(--muted); }
+  .sig-cell.on {
+    background: rgba(88, 166, 255, 0.12);
+    border-color: var(--bc); animation: pop 0.3s ease;
+  }
+  .sig-cell.on .ltr { color: var(--text); }
+  .sig-cell.on .cnt { color: var(--bc); font-weight: bold; }
+  .sig-key {
+    text-align: center; margin-top: 0.7rem;
+    font-family: var(--mono); font-size: 0.95rem; color: var(--text);
+  }
+  .sig-key b { color: var(--bc); }
+  .sig-placeholder { text-align: center; color: var(--muted); font-size: 0.9rem; padding: 1.4rem 0; }
+
+  /* hash map 籃子 */
+  .buckets { display: flex; flex-direction: column; gap: 10px; margin: 0.4rem 0 0.2rem; }
+  .buckets:empty::after {
+    content: "還沒有籃子，點「下一步」開始分組。";
+    color: var(--muted); font-size: 0.88rem;
+  }
+  .bucket {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    border: 1px solid var(--border); border-left: 4px solid var(--bc);
+    border-radius: 8px; padding: 0.55rem 0.8rem; animation: pop 0.3s ease;
+    transition: background 0.25s;
+  }
+  .bucket.flash { background: rgba(88, 166, 255, 0.08); }
+  .bucket-key {
+    font-family: var(--mono); font-size: 0.8rem; color: var(--muted);
+    white-space: nowrap; padding-right: 10px; border-right: 1px solid var(--border);
+  }
+  .bucket-key b { color: var(--bc); }
+  .bucket-items { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 0.28rem 0.55rem; border-radius: 6px; font-family: var(--mono);
+    font-size: 0.9rem; background: rgba(110, 118, 129, 0.14);
+    border: 1px solid var(--bc); color: var(--text);
+  }
+  .chip.just { animation: pop 0.3s ease; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Group Anagrams</h1>
+  <p class="subtitle">把「字母組成相同」的字串分到同一組（Medium）</p>
+
+  <!-- 1. 核心觀察 -->
+  <div class="section">
+    <h2><span class="step-num">1</span>核心觀察</h2>
+    <p>互為變位詞（anagram）的字串，例如 <code>eat</code>、<code>tea</code>、<code>ate</code>，字元順序不同，但<strong>用到的字母和次數完全一樣</strong>。</p>
+    <p>所以只要替每個字串算出一個「字母組成簽名」，<span class="hl">同一組會算出同一個簽名</span>，不同組則不同。把簽名當 hash map 的 key，同簽名的字串自然落進同一個籃子，<strong>完全不用兩兩比較</strong>。</p>
+
+    <div class="key">
+      <strong>心智模型</strong>：把每個字串壓成一個「長度 26 的字母計數」——第 0 格是 a 出現幾次、第 1 格是 b……第 25 格是 z。變位詞的計數一模一樣，就是天然的分組 key。
+    </div>
+
+    <p class="muted" style="font-size:0.9rem">計數是一個 list，list 不能當 hash map 的 key，轉成 <code>tuple</code> 就可以（tuple 不可變、可雜湊）。</p>
+  </div>
+
+  <!-- 2. 視覺化過程 -->
+  <div class="section">
+    <h2><span class="step-num">2</span>視覺化過程</h2>
+    <p>輸入：<code class="mono">["eat", "tea", "tan", "ate", "nat", "bat"]</code></p>
+
+    <p class="phase-label">逐一處理每個字串（高亮＝正在處理，虛線＝下一個）</p>
+    <div class="words-row" id="wordsRow"></div>
+
+    <p class="phase-label">這個字串的字母計數簽名（長度 26，只有出現過的字母會被點亮）</p>
+    <div class="sig-panel" id="sigPanel"></div>
+
+    <div class="controls">
+      <button class="btn ghost" id="prevBtn">上一步</button>
+      <button class="btn" id="nextBtn">下一步</button>
+      <button class="btn-reset" id="resetBtn">重設</button>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <p class="phase-label">hash map（key = 計數簽名，value = 同簽名的字串清單）</p>
+    <div class="buckets" id="buckets"></div>
+  </div>
+
+  <!-- 3. 程式碼 -->
+  <div class="section">
+    <h2><span class="step-num">3</span>程式碼</h2>
+<pre><span class="kw">def</span> <span class="fn">groupAnagrams</span>(strs):
+    res = {}                                  <span class="cm"># key: 計數 tuple，value: 字串清單</span>
+    <span class="kw">for</span> s <span class="kw">in</span> strs:
+        count = [<span class="num">0</span>] * <span class="num">26</span>                      <span class="cm"># a~z 各一格</span>
+        <span class="kw">for</span> c <span class="kw">in</span> s:
+            count[<span class="fn">ord</span>(c) - <span class="fn">ord</span>(<span class="str">"a"</span>)] += <span class="num">1</span>      <span class="cm"># 累加這個字母的次數</span>
+        key = <span class="fn">tuple</span>(count)                   <span class="cm"># list 不能當 key，轉 tuple</span>
+        <span class="kw">if</span> key <span class="kw">not in</span> res:                 <span class="cm"># 籃子不存在就先開一個空 list</span>
+            res[key] = []
+        res[key].append(s)                    <span class="cm"># 丟進對應籃子</span>
+    <span class="kw">return</span> <span class="fn">list</span>(res.values())              <span class="cm"># 所有籃子</span>
+</pre>
+    <div class="note"><strong>最容易踩的雷</strong>：少了 <code>if key not in res: res[key] = []</code> 就直接 <code>res[key].append(s)</code>，第一次遇到該 key 時那個籃子還沒被建出來，會噴 <code>KeyError</code>。</div>
+  </div>
+
+  <!-- 4. 複雜度 -->
+  <div class="section">
+    <h2><span class="step-num">4</span>複雜度</h2>
+    <table class="cx">
+      <tr><td>時間 O(m · n)</td><td>m 個字串、平均長度 n。每個字串掃一次做計數，計數陣列固定 26 格（常數），所以總共 O(m · n)。</td></tr>
+      <tr><td>空間 O(m · n)</td><td>hash map 要把所有字串存下來當 value。</td></tr>
+    </table>
+    <div class="note" style="border-left-color:var(--accent); background:rgba(88,166,255,0.08)">
+      <strong>對照「排序當 key」</strong>：用 <code>"".join(sorted(s))</code> 當 key 更好寫，但每個字串要 <code>O(n log n)</code> 排序，總時間變 <code>O(m · n log n)</code>，比計數法慢。面試手寫計數法、排序法口頭帶過即可。
+    </div>
+  </div>
+
+</div>
+
+<script>
+  "use strict";
+  const strs = ["eat", "tea", "tan", "ate", "nat", "bat"];
+  const A = "a".charCodeAt(0);
+  // 籃子配色（一律走 token），簽名點亮色 = 該字串會落進的籃子色
+  const palette = ["var(--accent)", "var(--warn)", "var(--purple)", "var(--ptr-r)", "var(--accent2)", "var(--ptr-m)"];
+
+  // 全部狀態只由 idx（已處理的字串數，0..strs.length）決定，
+  // prev / next / reset 都靠 render(idx) 重建，狀態機不會漂移。
+  let idx = 0;
+
+  const wordsRow = document.getElementById("wordsRow");
+  const sigPanel = document.getElementById("sigPanel");
+  const bucketsEl = document.getElementById("buckets");
+  const logEl = document.getElementById("log");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  function countOf(s) {
+    const c = new Array(26).fill(0);
+    for (const ch of s) c[ch.charCodeAt(0) - A]++;
+    return c;
+  }
+  // 計數轉成可讀 key，例如 a1e1t1
+  function keyStr(count) {
+    let k = "";
+    for (let i = 0; i < 26; i++) if (count[i] > 0) k += String.fromCharCode(A + i) + count[i];
+    return k;
+  }
+  // 處理前 n 個字串，回傳籃子與其出現順序
+  function computeState(n) {
+    const res = {}, order = [];
+    for (let i = 0; i < n; i++) {
+      const k = keyStr(countOf(strs[i]));
+      if (!(k in res)) { res[k] = []; order.push(k); }
+      res[k].push(strs[i]);
+    }
+    return { res, order };
+  }
+  function colorFor(order, k) {
+    const i = order.indexOf(k);
+    return palette[((i % palette.length) + palette.length) % palette.length];
+  }
+
+  function renderWords(order) {
+    wordsRow.innerHTML = "";
+    strs.forEach((s, i) => {
+      const d = document.createElement("div");
+      let cls = "word";
+      if (i === idx - 1) {
+        cls += " active";
+        d.style.setProperty("--bc", colorFor(order, keyStr(countOf(s))));
+      } else if (i < idx) {
+        cls += " done";
+      } else if (i === idx) {
+        cls += " next";
+      } else {
+        cls += " pending";
+      }
+      d.className = cls;
+      d.textContent = '"' + s + '"';
+      wordsRow.appendChild(d);
+    });
+  }
+
+  function renderSig(order) {
+    if (idx === 0) {
+      sigPanel.innerHTML = '<div class="sig-placeholder">點「下一步」開始，這裡會顯示每個字串的字母計數簽名。</div>';
+      return;
+    }
+    const s = strs[idx - 1];
+    const count = countOf(s);
+    const k = keyStr(count);
+    const bc = colorFor(order, k);
+    let cells = "";
+    for (let i = 0; i < 26; i++) {
+      const on = count[i] > 0;
+      const letter = String.fromCharCode(A + i);
+      cells +=
+        '<div class="sig-cell' + (on ? " on" : "") + '"' + (on ? ' style="--bc:' + bc + '"' : "") + ">" +
+        '<span class="ltr">' + letter + "</span>" +
+        '<span class="cnt">' + count[i] + "</span></div>";
+    }
+    sigPanel.innerHTML =
+      '<div class="sig-caption">"' + s + '" → 逐字母數出現次數</div>' +
+      '<div class="sig-strip">' + cells + "</div>" +
+      '<div class="sig-key" style="--bc:' + bc + '">key = (<b>' + k + "</b>)</div>";
+  }
+
+  function renderBuckets(order, res, flashKey) {
+    bucketsEl.innerHTML = "";
+    order.forEach(k => {
+      const bc = colorFor(order, k);
+      const b = document.createElement("div");
+      b.className = "bucket" + (k === flashKey ? " flash" : "");
+      b.style.setProperty("--bc", bc);
+      const chips = res[k]
+        .map((w, i) => {
+          const isJust = k === flashKey && i === res[k].length - 1;
+          return '<span class="chip' + (isJust ? " just" : "") + '">"' + w + '"</span>';
+        })
+        .join("");
+      b.innerHTML = '<span class="bucket-key">key=<b>' + k + "</b></span>" +
+                    '<span class="bucket-items">' + chips + "</span>";
+      bucketsEl.appendChild(b);
+    });
+  }
+
+  function renderLog(order, res) {
+    if (idx === 0) {
+      logEl.innerHTML = "點「下一步」開始：逐一處理每個字串，算出計數簽名再放進對應籃子。";
+      return;
+    }
+    const s = strs[idx - 1];
+    const k = keyStr(countOf(s));
+    const isNew = res[k].length === 1; // 這個籃子剛被建出來
+    let msg;
+    if (isNew) {
+      msg = '處理 <span class="new">"' + s + '"</span> → 計數 (' + k + ') <span class="new">第一次出現，新開一個籃子</span>';
+    } else {
+      msg = '處理 <span class="ok">"' + s + '"</span> → 計數 (' + k + ') 已存在，<span class="ok">丟進同一籃</span>';
+    }
+    if (idx >= strs.length) {
+      msg += '　|　全部處理完，回傳 <span class="ok">' + order.length + "</span> 組。";
+    }
+    logEl.innerHTML = msg;
+  }
+
+  function render() {
+    const { res, order } = computeState(idx);
+    const flashKey = idx > 0 ? keyStr(countOf(strs[idx - 1])) : null;
+
+    renderWords(order);
+    renderSig(order);
+    renderBuckets(order, res, flashKey);
+    renderLog(order, res);
+
+    prevBtn.disabled = idx === 0;
+    nextBtn.disabled = idx >= strs.length;
+    nextBtn.textContent = idx >= strs.length ? "完成" : "下一步";
+  }
+
+  nextBtn.addEventListener("click", () => { if (idx < strs.length) { idx++; render(); } });
+  prevBtn.addEventListener("click", () => { if (idx > 0) { idx--; render(); } });
+  resetBtn.addEventListener("click", () => { idx = 0; render(); });
+
+  render();
+</script>
+</body>
+</html>

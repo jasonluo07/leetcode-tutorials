@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invert Binary Tree 互動教學</title>
+<link rel="stylesheet" href="../css/tokens.css">
+<style>
+  /* ===== 本題獨有的視覺化 layout（顏色一律走 var(--token)）===== */
+
+  /* 樹的舞台：固定尺寸，窄螢幕可橫向捲動 */
+  .tree-wrap { overflow-x: auto; margin: 0.6rem 0; }
+  .tree-stage {
+    position: relative; width: 560px; height: 320px; margin: 0 auto;
+  }
+  /* 連線（固定，畫一次）*/
+  .edges { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .edges line { stroke: var(--border); stroke-width: 2; }
+
+  /* 節點：在槽位間滑動 */
+  .tnode {
+    position: absolute; width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-weight: 700; font-size: 1.05rem;
+    background: var(--panel2); border: 2px solid var(--border); color: var(--text);
+    z-index: 2;
+    transition: left 0.5s ease, top 0.5s ease,
+                border-color 0.25s, box-shadow 0.25s, background 0.25s, color 0.25s;
+  }
+  .tnode.current {
+    border-color: var(--accent); color: var(--text);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+  }
+  .tnode.swap { border-color: var(--warn); background: rgba(210, 153, 34, 0.22); }
+  .tnode.done { border-color: var(--accent2); }
+
+  /* 樹旁的小圖例 */
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+            color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
+  .legend .dot { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 50%;
+                 vertical-align: -1px; margin-right: 4px; border: 2px solid; }
+  .legend .d-cur { border-color: var(--accent); }
+  .legend .d-swap { border-color: var(--warn); background: rgba(210, 153, 34, 0.22); }
+  .legend .d-done { border-color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Invert Binary Tree</h1>
+  <p class="subtitle">把整棵二元樹左右翻轉成鏡像（Easy）</p>
+
+  <!-- 1. 核心觀察 -->
+  <div class="section">
+    <h2><span class="step-num">1</span>核心觀察</h2>
+    <p>「翻轉」就是把樹照鏡子：每個節點的<strong>左右子樹對調</strong>，而且要一路換到底。</p>
+    <p>關鍵在於，每個節點要做的事<strong>一模一樣</strong>：把自己的左右孩子交換。既然每個節點做同一件事、而且子樹本身也是一棵樹，這就是<span class="hl">遞迴</span>的教科書形狀。</p>
+    <div class="key">
+      <strong>心智模型</strong>：對每個節點，<b>先換掉自己的左右孩子，再叫左右孩子各自做一樣的事</b>。遞迴的終點（base case）是走到空節點，直接返回。
+    </div>
+    <p class="muted">交換的是「整棵子樹」，不是只換兩個節點的值。換了根的左右孩子，底下所有子孫也跟著被帶到對面。</p>
+  </div>
+
+  <!-- 2. 視覺化 -->
+  <div class="section">
+    <h2><span class="step-num">2</span>視覺化過程</h2>
+    <p class="muted" style="margin-bottom:0.2rem">preorder 走訪：<b>先處理目前節點（換左右子樹），再遞迴左、遞迴右</b>。看每個節點被走到時，它的兩棵子樹整個滑到對面。</p>
+
+    <div class="tree-wrap">
+      <div class="tree-stage" id="stage">
+        <svg class="edges" id="edges" width="560" height="320" viewBox="0 0 560 320"></svg>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot d-cur"></span>目前走訪的節點</span>
+      <span><span class="dot d-swap"></span>剛被交換的孩子</span>
+      <span><span class="dot d-done"></span>完成</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="stepBtn">下一步 ▶</button>
+      <button class="btn ghost" id="autoBtn">自動播放</button>
+      <button class="btn-reset" id="resetBtn">重設</button>
+    </div>
+
+    <div class="status" id="status">按「下一步」開始 preorder 走訪。目前的樹還沒翻轉。</div>
+
+    <pre class="code" id="code"><span class="ln" data-line="1"><span class="kw">def</span> <span class="fn">invertTree</span>(root):</span><span class="ln" data-line="2">    <span class="kw">if</span> <span class="kw">not</span> root:                          <span class="cm"># 空節點：到底了</span></span><span class="ln" data-line="3">        <span class="kw">return</span> <span class="kw">None</span></span><span class="ln" data-line="4">    root.left, root.right <span class="op">=</span> root.right, root.left  <span class="cm"># 交換左右孩子</span></span><span class="ln" data-line="5">    <span class="fn">invertTree</span>(root.left)               <span class="cm"># 遞迴反轉左子樹</span></span><span class="ln" data-line="6">    <span class="fn">invertTree</span>(root.right)              <span class="cm"># 遞迴反轉右子樹</span></span><span class="ln" data-line="7">    <span class="kw">return</span> root</span></pre>
+  </div>
+
+  <!-- 3. 程式碼 -->
+  <div class="section">
+    <h2><span class="step-num">3</span>程式碼</h2>
+<pre><span class="kw">def</span> <span class="fn">invertTree</span>(root):
+    <span class="kw">if</span> <span class="kw">not</span> root:
+        <span class="kw">return</span> <span class="kw">None</span>
+    root.left, root.right <span class="op">=</span> root.right, root.left  <span class="cm"># 一行同時交換</span>
+    <span class="fn">invertTree</span>(root.left)
+    <span class="fn">invertTree</span>(root.right)
+    <span class="kw">return</span> root</pre>
+    <div class="note"><strong>最容易踩的雷</strong>：交換要<strong>同時</strong>進行。寫成兩行 <code>root.left = root.right</code> 再 <code>root.right = root.left</code> 會先把左邊蓋掉，兩邊都變成原本的右邊。Python 的 <code>a, b = b, a</code> 是同時賦值，安全；其他語言要用暫存變數。</div>
+    <p class="muted" style="margin-top:0.6rem">先交換再遞迴（preorder）或先遞迴再交換（postorder）結果都對，重點是<strong>每個節點都要換一次</strong>。</p>
+  </div>
+
+  <!-- 4. 複雜度 -->
+  <div class="section">
+    <h2><span class="step-num">4</span>複雜度</h2>
+    <table class="cx">
+      <tr><td>時間 O(n)</td><td>每個節點剛好被走訪並交換一次，n 是節點總數。</td></tr>
+      <tr><td>空間 O(h)</td><td>遞迴堆疊深度等於樹高 h。平衡樹 O(log n)，最壞（歪斜成一條鏈）退化成 O(n)。</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  // ---- 固定 7 槽位（完全二元樹）與固定連線 ----
+  const NR = 23; // node radius
+  const SLOTS = [
+    { x: 280, y: 38 },                                  // 0 root
+    { x: 150, y: 150 }, { x: 410, y: 150 },             // 1,2
+    { x: 80, y: 262 }, { x: 220, y: 262 },              // 3,4
+    { x: 340, y: 262 }, { x: 480, y: 262 },             // 5,6
+  ];
+  const EDGES = [[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]];
+  const INIT = [4, 2, 7, 1, 3, 6, 9];                   // 槽位初始值
+  const VISIT_ORDER = [0, 1, 3, 4, 2, 5, 6];            // preorder（槽位）
+
+  const stage = document.getElementById("stage");
+  const edgesSvg = document.getElementById("edges");
+  const statusEl = document.getElementById("status");
+  const stepBtn = document.getElementById("stepBtn");
+  const autoBtn = document.getElementById("autoBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  let slotVal, stepIdx, nodeEls, timer;
+
+  function hasChildren(slot) { return 2 * slot + 2 <= 6; }
+
+  // 交換 a、b 兩槽位為根的整棵子樹
+  function swapSubtrees(a, b) {
+    const t = slotVal[a]; slotVal[a] = slotVal[b]; slotVal[b] = t;
+    if (2 * a + 2 <= 6) {
+      swapSubtrees(2 * a + 1, 2 * b + 1);
+      swapSubtrees(2 * a + 2, 2 * b + 2);
+    }
+  }
+
+  function drawEdges() {
+    edgesSvg.innerHTML = "";
+    EDGES.forEach(([p, c]) => {
+      const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      l.setAttribute("x1", SLOTS[p].x); l.setAttribute("y1", SLOTS[p].y);
+      l.setAttribute("x2", SLOTS[c].x); l.setAttribute("y2", SLOTS[c].y);
+      edgesSvg.appendChild(l);
+    });
+  }
+
+  function buildNodes() {
+    stage.querySelectorAll(".tnode").forEach(e => e.remove());
+    nodeEls = {};
+    INIT.forEach(v => {
+      const d = document.createElement("div");
+      d.className = "tnode";
+      d.textContent = v;
+      stage.appendChild(d);
+      nodeEls[v] = d;
+    });
+  }
+
+  function setActiveLine(n) {
+    document.querySelectorAll("#code .ln").forEach(el => el.classList.remove("active"));
+    const el = document.querySelector(`#code .ln[data-line="${n}"]`);
+    if (el) el.classList.add("active");
+  }
+
+  function place(current, swapped, done) {
+    for (let s = 0; s < 7; s++) {
+      const el = nodeEls[slotVal[s]];
+      el.style.left = (SLOTS[s].x - NR) + "px";
+      el.style.top = (SLOTS[s].y - NR) + "px";
+      el.classList.remove("current", "swap", "done");
+      if (done) el.classList.add("done");
+    }
+    if (!done && current != null) {
+      nodeEls[slotVal[current]].classList.add("current");
+      (swapped || []).forEach(s => nodeEls[slotVal[s]].classList.add("swap"));
+    }
+  }
+
+  function finish() {
+    stepBtn.disabled = true;
+    stepBtn.textContent = "完成";
+    stopAuto();
+    setActiveLine(7);
+    place(null, null, true);
+    statusEl.className = "status found";
+    statusEl.innerHTML = "全部走訪完，樹已完全翻轉成鏡像。原本 4 的左子樹（2,1,3）和右子樹（7,6,9）整個對調，每個節點的左右也都換了。";
+  }
+
+  function step() {
+    if (stepIdx >= VISIT_ORDER.length) return;
+    const slot = VISIT_ORDER[stepIdx];
+    const val = slotVal[slot];
+
+    if (hasChildren(slot)) {
+      const lc = slotVal[2 * slot + 1], rc = slotVal[2 * slot + 2];
+      swapSubtrees(2 * slot + 1, 2 * slot + 2);
+      setActiveLine(4);
+      place(slot, [2 * slot + 1, 2 * slot + 2], false);
+      statusEl.className = "status";
+      statusEl.innerHTML =
+        `走訪節點 <b>${val}</b>：交換它的左右子樹` +
+        `（左邊 <b>${lc}</b> 和右邊 <b>${rc}</b> 整棵對調）。`;
+    } else {
+      setActiveLine(2);
+      place(slot, null, false);
+      statusEl.className = "status";
+      statusEl.innerHTML =
+        `走訪節點 <b>${val}</b>：葉子節點，兩個孩子都是空的，遞迴到底、直接返回。`;
+    }
+
+    stepIdx++;
+    if (stepIdx >= VISIT_ORDER.length) finish();
+  }
+
+  function stopAuto() {
+    if (timer) { clearInterval(timer); timer = null; autoBtn.textContent = "自動播放"; }
+  }
+  function toggleAuto() {
+    if (timer) { stopAuto(); return; }
+    if (stepBtn.disabled) return;
+    autoBtn.textContent = "暫停";
+    timer = setInterval(() => {
+      if (stepBtn.disabled) { stopAuto(); return; }
+      step();
+    }, 950);
+  }
+
+  function reset() {
+    stopAuto();
+    slotVal = INIT.slice();
+    stepIdx = 0;
+    stepBtn.disabled = false;
+    stepBtn.textContent = "下一步 ▶";
+    statusEl.className = "status";
+    statusEl.innerHTML = "按「下一步」開始 preorder 走訪。目前的樹還沒翻轉。";
+    setActiveLine(1);
+    buildNodes();
+    place(null, null, false);
+  }
+
+  stepBtn.addEventListener("click", () => { stopAuto(); step(); });
+  autoBtn.addEventListener("click", toggleAuto);
+  resetBtn.addEventListener("click", reset);
+
+  drawEdges();
+  reset();
+</script>
+</body>
+</html>
